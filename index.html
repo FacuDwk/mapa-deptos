@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa de Departamentos — Alberdi y Centro (Córdoba)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --panel: #ffffff;
+      --header: #111827;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #2563eb;
+      --alta: #10b981;
+      --media: #f59e0b;
+      --baja: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--header);
+      color: #fff;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+      z-index: 1000;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .brand span { font-size: 12px; color: #9ca3af; }
+    .stats-bar { display: flex; gap: 14px; align-items: center; font-size: 12px; flex-wrap: wrap; }
+    .stat-pill {
+      background: rgba(255,255,255,0.1);
+      padding: 4px 10px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .stat-pill strong { color: #93c5fd; font-weight: 700; }
+    .hdr-actions { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn-ghost {
+      background: rgba(255,255,255,0.12);
+      color: #f3f4f6;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.22); }
+
+    .layout {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    aside {
+      width: 390px;
+      max-width: 92vw;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      transition: margin-left 0.2s ease;
+      z-index: 900;
+    }
+    aside.collapsed { margin-left: -390px; }
+
+    .filters {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      flex-shrink: 0;
+    }
+    .search-box {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 7px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search-box:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.12); }
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .filter-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .filter-group select {
+      width: 100%;
+      padding: 5px 7px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+    }
+    .slider-wrap { display: flex; flex-direction: column; gap: 3px; }
+    .slider-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--muted); }
+    .slider-head strong { color: var(--text); }
+    input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+    .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      align-items: center;
+    }
+    .checks label { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--muted);
+      padding-top: 2px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.2); }
+
+    .list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 10px 11px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .card:hover { border-color: #93c5fd; box-shadow: 0 2px 6px rgba(37,99,235,0.08); }
+    .card.active { border-color: var(--accent); background: #eff6ff; }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+    .card-title { font-size: 13px; font-weight: 700; color: #111827; line-height: 1.25; }
+    .row-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #e5e7eb;
+      color: #374151;
+      flex-shrink: 0;
+    }
+    .card-price { font-size: 13px; font-weight: 700; color: #059669; margin-bottom: 4px; }
+    .card-price span { font-weight: 500; color: var(--muted); font-size: 11px; margin-left: 4px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+    }
+    .badge.alta { background: #d1fae5; color: #065f46; }
+    .badge.media { background: #fef3c7; color: #92400e; }
+    .badge.baja { background: #e2e8f0; color: #475569; }
+    .badge.gas-si { background: #dbeafe; color: #1e40af; }
+    .badge.gas-no { background: #fee2e2; color: #991b1b; }
+    .badge.approx { background: #ede9fe; color: #5b21b6; }
+
+    #map { flex: 1; width: 100%; height: 100%; }
+
+    .leaflet-popup-content-wrapper { border-radius: 10px; padding: 2px; }
+    .leaflet-popup-content { margin: 11px 13px; width: 295px !important; font-size: 12px; line-height: 1.4; }
+    .pop-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 5px; }
+    .pop-title { font-size: 14px; font-weight: 700; color: #111827; }
+    .pop-price { font-size: 15px; font-weight: 800; color: #059669; margin-bottom: 6px; }
+    .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin-bottom: 8px; background: #f9fafb; padding: 7px 8px; border-radius: 7px; border: 1px solid #f3f4f6; }
+    .pop-kv b { color: #4b5563; font-weight: 600; }
+    .pop-notes { color: #374151; font-size: 11.5px; margin-bottom: 9px; max-height: 92px; overflow-y: auto; }
+    .pop-links { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pop-btn {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff !important;
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 11.5px;
+    }
+    .pop-btn:hover { background: #1d4ed8; }
+
+    .marker-pin {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s;
+    }
+    .marker-pin:hover { transform: scale(1.18); z-index: 9999 !important; }
+    .landmark-pin {
+      background: #7c3aed;
+      color: #fff;
+      border: 2px solid #fff;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    @media (max-width: 720px) {
+      aside { position: absolute; left: 0; top: 0; bottom: 0; height: 100%; }
+      .stats-bar { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <button class="btn btn-ghost" id="toggleSidebar" title="Mostrar/ocultar panel">☰ Lista</button>
+      <div>
+        <h1>Departamentos — Alberdi y Centro</h1>
+        <span>Mapa sincronizado con tu Google Sheet (40 candidatos)</span>
+      </div>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-pill">Mostrando: <strong id="statCount">0 / 40</strong></div>
+      <div class="stat-pill">Prom. USD: <strong id="statAvgPrice">-</strong></div>
+      <div class="stat-pill">Prom. USD/m²: <strong id="statAvgM2">-</strong></div>
+      <div class="stat-pill" id="syncStatusPill">Origen: <strong id="syncStatus">Datos locales</strong></div>
+    </div>
+    <div class="hdr-actions">
+      <button class="btn btn-ghost" id="syncBtn" title="Traer cambios en vivo desde Google Sheets">🔄 Actualizar</button>
+      <button class="btn btn-ghost" id="fitBtn">Centrar mapa</button>
+      <button class="btn" id="resetBtn">Limpiar filtros</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside id="sidebar">
+      <div class="filters">
+        <input type="text" class="search-box" id="searchInput" placeholder="Buscar calle, fila (#24), inmobiliaria, apto crédito..." />
+
+        <div class="slider-wrap">
+          <div class="slider-head">
+            <span>Precio máximo</span>
+            <strong id="maxPriceLabel">USD 75.000</strong>
+          </div>
+          <input type="range" id="maxPrice" min="45000" max="75000" step="500" value="75000" />
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Prioridad</label>
+            <select id="priorityFilter">
+              <option value="all">Todas</option>
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baja</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Gas Natural</label>
+            <select id="gasFilter">
+              <option value="all">Todos</option>
+              <option value="si">Sí conectado</option>
+              <option value="no">No tiene / Eléctrico</option>
+              <option value="verif">A verificar</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Dormitorios</label>
+            <select id="bedFilter">
+              <option value="all">Todos</option>
+              <option value="1">1 Dormitorio</option>
+              <option value="2">1½ o 2 Dormitorios</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Colorear puntos por</label>
+            <select id="colorMode">
+              <option value="priority">Prioridad</option>
+              <option value="price">Precio (USD)</option>
+              <option value="usdm2">USD / m²</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="checks">
+          <label><input type="checkbox" id="chkCredito" /> Apto crédito</label>
+          <label><input type="checkbox" id="chkEscritura" /> Con escritura</label>
+          <label><input type="checkbox" id="chkLandmarks" checked /> Referencias</label>
+        </div>
+
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="list" id="propList"></div>
+    </aside>
+
+    <div id="map"></div>
+  </div>
+
+  <script>
+    // Pegá acá la URL /exec de tu Google Apps Script para que se actualice solo al abrirlo:
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzNbGu0cJexBQWEmVR9wZlmm44vYX0k1z3HgZLWuwWIecaYJ5hfFTyWtVYdHTzHA_JaIQ/exec";
+    const DATA = {
+    "generatedAt":  "2026-11-23T15:24:18",
+    "totalProperties":  40,
+    "properties":  [
+                       {
+                           "row":  7,
+                           "address":  "Coronel Olmedo 62 (Barrio Alberdi)",
+                           "approx":  false,
+                           "geoQuery":  "Coronel Olmedo 62",
+                           "geoDisplay":  "62, Coronel Agustín Olmedo, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4105937,
+                           "lon":  -64.1999359,
+                           "floor":  "PB",
+                           "price":  "USD 62.000",
+                           "priceNum":  62000,
+                           "expenses":  "$60.000",
+                           "area":  "40 m²",
+                           "areaNum":  40,
+                           "usdM2":  "USD 1.550",
+                           "usdM2Num":  1550,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Patio",
+                           "lighting":  "A verificar",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No Posee",
+                           "disposition":  "Interno / PB",
+                           "condition":  "Reciclado a nuevo",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "CURVAN (CPI-8310) - Ref: 2209",
+                           "notes":  "Totalmente reciclado a nuevo en PB con patio, cocina semi integrada, expensas bajas, apto crédito. A 2 cuadras de Jefatura y cerca de Nuevocentro Shopping.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.cordobaprop.com/propiedad/60373-venta-departamento-reciclado-a-nuevo-alberdi-1-dormitorio-pb-con-patio",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  8,
+                           "address":  "Santa Rosa 1484",
+                           "approx":  false,
+                           "geoQuery":  "Santa Rosa 1484",
+                           "geoDisplay":  "1484, Santa Rosa, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4066209,
+                           "lon":  -64.202688,
+                           "floor":  "1° Contrafrente",
+                           "price":  "USD 60.500",
+                           "priceNum":  60500,
+                           "expenses":  "No informa",
+                           "area":  "63 m²",
+                           "areaNum":  63,
+                           "usdM2":  "USD 960",
+                           "usdM2Num":  960,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (2 balcones)",
+                           "lighting":  "A verificar",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "Opcional (en alquiler)",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Excelente (3 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Inmobiliaria Rojas (CPI-7920) - Ref: 265",
+                           "notes":  "Sup. cubierta 45 m² / total 63 m², 3 años de antigüedad, 2 balcones, cocina separada equipada, vestidor, 2 ascensores. Edificio moderno con fachada patrimonio histórico, galería comercial y área gastronómica. Boleto listo para escriturar.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.cordobaprop.com/propiedad/56747-vendo-dpto-c1-dorm-b-alberdi",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  9,
+                           "address":  "Av. Colón 1180",
+                           "approx":  false,
+                           "geoQuery":  "Avenida Colon 1180",
+                           "geoDisplay":  "1180, Avenida Colón, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.408814,
+                           "lon":  -64.1990151,
+                           "floor":  "2° B",
+                           "price":  "USD 65.000",
+                           "priceNum":  65000,
+                           "expenses":  "$65.000",
+                           "area":  "45 m²",
+                           "areaNum":  45,
+                           "usdM2":  "USD 1.444",
+                           "usdM2Num":  1444,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí",
+                           "lighting":  "A verificar",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No Posee",
+                           "disposition":  "Frente / Contrafrente",
+                           "condition":  "Nuevo",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Lopez Baena Propiedades (CPI Córdoba) - Ref: 5642258",
+                           "notes":  "Edificio VICINO V. Nuevo, apto crédito y escritura, facilidades de pago. Actualmente alquilado ($500.000/mes) con 1 año restante o cláusula de venta de 60 días.",
+                           "links":  [
+                                         {
+                                             "url":  "https://clasificados.lavoz.com.ar/avisos/inmuebles/departamento/5642258/departamento-1-dormitorio-c-balcon-b-centro-alberdi-oportunidad",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  10,
+                           "address":  "Santa Rosa 1000",
+                           "approx":  false,
+                           "geoQuery":  "Santa Rosa 1000",
+                           "geoDisplay":  "Santa Rosa, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4081582,
+                           "lon":  -64.1976374,
+                           "floor":  "A verificar (edificio de 7 pisos)",
+                           "price":  "USD 52.000",
+                           "priceNum":  52000,
+                           "expenses":  "$152.000",
+                           "area":  "46 m²",
+                           "areaNum":  46,
+                           "usdM2":  "USD 1.130",
+                           "usdM2Num":  1130,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí",
+                           "lighting":  "Muy Buena (Orientación Norte, cocina con ventana)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "Sí (Lavadero con carga y descarga)",
+                           "garage":  "No Posee",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Excelente (11 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Ariel Moyano - REMAX Ultra (CPI 8062) - Ref: 421701151-6",
+                           "notes":  "A mts de Plaza Colón. Cocina separada con ventilación natural y lavadero, artefacto cocina a gas natural, baño zonificado con antebaño. Orientación Norte. Financiable Lendar.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.remax.com.ar/listings/venta-dpto-1-dorm-cocina-separada-plaza-colon",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  11,
+                           "address":  "9 de Julio 1329",
+                           "approx":  false,
+                           "geoQuery":  "9 de Julio 1329",
+                           "geoDisplay":  "1329, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4095928,
+                           "lon":  -64.201696,
+                           "floor":  "A verificar",
+                           "price":  "USD 64.000",
+                           "priceNum":  64000,
+                           "expenses":  "No informa",
+                           "area":  "46 m²",
+                           "areaNum":  46,
+                           "usdM2":  "USD 1.391",
+                           "usdM2Num":  1391,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "No (Edificio 100% eléctrico)",
+                           "laundry":  "Sí (Conexión lavarropas / lavadero)",
+                           "garage":  "No informa",
+                           "disposition":  "A verificar",
+                           "condition":  "Bueno (9 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Martin Cufre Servicios Inmobiliarios (Tel: 351-3153714) - Ref: CAP9572295 / ZP 60048658",
+                           "notes":  "Sup. cubierta 44 m² / semicubierta 2 m² / total 46 m². Edificio 100% eléctrico (anafe, horno y termotanque eléctricos). Baño y antebaño, vestidor, pisos de porcelanato, mesada de granito, sanitarios Ferrum, griferías FV. A 1 cuadra de Av. Colón y mts de Av. Santa Fe. Boleto con pronta escrituración. Alquilado hasta agosto.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-departamento-en-alberdi-60048658.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  12,
+                           "address":  "9 de Julio 1329 (Otra inmobiliaria)",
+                           "approx":  false,
+                           "geoQuery":  "9 de Julio 1329",
+                           "geoDisplay":  "1329, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4095928,
+                           "lon":  -64.201696,
+                           "floor":  "A verificar",
+                           "price":  "USD 61.000",
+                           "priceNum":  61000,
+                           "expenses":  "No informa",
+                           "area":  "46 m²",
+                           "areaNum":  46,
+                           "usdM2":  "USD 1.326",
+                           "usdM2Num":  1326,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "No (Edificio 100% eléctrico)",
+                           "laundry":  "Sí (Conexiones para lavarropas)",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Bueno (9 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "LEVEN Negocios Inmobiliarios (CPI 7440, Tel: 351-7345328) - Ref: LAP8150249 / ZP 59310024",
+                           "notes":  "POSIBLE MISMA UNIDAD QUE FILA 11 (USD 3.000 más barato). Sup. cub. 44 m² / semicub. 2 m² / tot. 46 m². Contrafrente, baño + antebaño, vestidor, edificio eléctrico, apto profesional. Boleto con pronta escrituración. Alquilado.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-venta-departamento-1-dormitorio-barrio-alberdi-59310024.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  13,
+                           "address":  "9 de Julio 1329 (Mismo edificio - 2 dorm/escritorio)",
+                           "approx":  false,
+                           "geoQuery":  "9 de Julio 1329",
+                           "geoDisplay":  "1329, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4095928,
+                           "lon":  -64.201696,
+                           "floor":  "1° B",
+                           "price":  "USD 68.000",
+                           "priceNum":  68000,
+                           "expenses":  "No informa",
+                           "area":  "No informa",
+                           "areaNum":  null,
+                           "usdM2":  "",
+                           "usdM2Num":  null,
+                           "bedrooms":  "1 1/2 - 2 Dormitorios",
+                           "bathrooms":  "1 Baño (c/ antebaño)",
+                           "balcony":  "Sí (al frente)",
+                           "lighting":  "Buena (frente, cocina c/ ventilación)",
+                           "gas":  "A verificar (edificio 9 de Julio 1329 es eléctrico)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (9 años aprox.)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Inmobiliaria Brun - Dario Patiño (FB Marketplace)",
+                           "notes":  "MISMO EDIFICIO QUE FILAS 11-12 (distinta unidad: 1° B al frente con 1 dorm + escritorio/2° dorm). PRECIO: figura USD 68.000 en ficha FB y USD 75.000 en descripción (confirmar). Cocina integrada con ventilación, antebaño + baño completo. No informa m² ni expensas.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.facebook.com/marketplace/item/1616194663189887/",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  14,
+                           "address":  "9 de Julio al 600",
+                           "approx":  true,
+                           "geoQuery":  "9 de Julio 650",
+                           "geoDisplay":  "650, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4122228,
+                           "lon":  -64.1924721,
+                           "floor":  "12°",
+                           "price":  "USD 55.000",
+                           "priceNum":  55000,
+                           "expenses":  "No informa",
+                           "area":  "54 m²",
+                           "areaNum":  54,
+                           "usdM2":  "USD 1.019",
+                           "usdM2Num":  1019,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "No informa",
+                           "lighting":  "Muy Buena (Luminoso, Orientación Norte)",
+                           "gas":  "A verificar (calefón y calefactor)",
+                           "laundry":  "Sí (en cocina separada)",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (43 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Solé Bienes Raíces (CPI 5552, Tel: 353-4185859) - Ref: AAP14427239 / ZP 60765370",
+                           "notes":  "Sup. propia/cubierta 41 m² / total 54 m². Apto crédito. Cocina separada, aire acondicionado, pisos parquet, cámaras de seguridad, ascensor. Orientación Norte, piso alto al frente. A pocas cuadras del Centro.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-venta-departamento-1-dormitorio-al-frente-piso-12-60765370.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  15,
+                           "address":  "Santa Fe 46",
+                           "approx":  false,
+                           "geoQuery":  "Avenida Santa Fe 46",
+                           "geoDisplay":  "46, Avenida Santa Fe, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4102919,
+                           "lon":  -64.2013936,
+                           "floor":  "6°",
+                           "price":  "USD 68.000",
+                           "priceNum":  68000,
+                           "expenses":  "$135.000",
+                           "area":  "59 m²",
+                           "areaNum":  59,
+                           "usdM2":  "USD 1.153",
+                           "usdM2Num":  1153,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Terraza propia",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (12 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Over Corporación Inmobiliaria (Tel: 351-8104056) - Ref: OAP12436676 / ZP 60674523",
+                           "notes":  "Sup. cubierta 40 m² / total propia 59 m² (terraza propia). Con escritura. Edificio con pileta, asadores, solarium y SUM. Permite mascotas, AA en dormitorio, cocina integrada. Actualmente alquilado (con renta).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-departamento-con-terraza-propia-y-edificio-con-pileta-60674523.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  16,
+                           "address":  "Nicolás Avellaneda 459",
+                           "approx":  false,
+                           "geoQuery":  "Nicolas Avellaneda 459",
+                           "geoDisplay":  "459, Nicolás Avellaneda, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4070587,
+                           "lon":  -64.1942945,
+                           "floor":  "2°",
+                           "price":  "USD 57.000",
+                           "priceNum":  57000,
+                           "expenses":  "$120.000",
+                           "area":  "58 m²",
+                           "areaNum":  58,
+                           "usdM2":  "USD 983",
+                           "usdM2Num":  983,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (Orientación Norte)",
+                           "lighting":  "Buena (Luminoso, Orientación Norte)",
+                           "gas":  "A verificar (todos los servicios activos)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente (ficha dice Interno)",
+                           "condition":  "Excelente (1 año / Nuevo)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Nuevo Puerto Inmuebles (Tel: 351-8541201) - Ref: 2E3ONH / ZP 60043307",
+                           "notes":  "Sup. cubierta 45-48 m² / semicub. 3 m² / total 58 m². Posesión inmediata, venta por boleto. Terraza común con 4 asadores, 2 ascensores, llave magnética, seguridad/encargado. Pisos porcelanato, grifería Johnson. A mts de Av. Colón y Plaza Colón.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-departamento-en-venta-avellaneda-400-alberdi-60043307.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  17,
+                           "address":  "Nicolás Avellaneda 459 (Mismo edificio)",
+                           "approx":  false,
+                           "geoQuery":  "Nicolas Avellaneda 459",
+                           "geoDisplay":  "459, Nicolás Avellaneda, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4070587,
+                           "lon":  -64.1942945,
+                           "floor":  "10°",
+                           "price":  "USD 72.500",
+                           "priceNum":  72500,
+                           "expenses":  "$110.000",
+                           "area":  "49 m²",
+                           "areaNum":  49,
+                           "usdM2":  "USD 1.480",
+                           "usdM2Num":  1480,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (Orientación SO) + Terraza común c/ asadores",
+                           "lighting":  "Buena (Orientación SO, vista costanera)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Excelente (A estrenar)",
+                           "priority":  "Baja",
+                           "score":  "6",
+                           "contact":  "Soys Inmobiliaria - Ref: PRO-464-455533 / AP 20031461",
+                           "notes":  "MISMO EDIFICIO QUE FILA 16 (piso 10° vs piso 2°, USD 15.500 más caro). Contado USD 72.500 / financiado USD 78.000. Posesión inmediata, venta por boleto. Terraza común con 4 asadores, 2 ascensores, llave magnética, seguridad, porcelanato, grifería Johnson.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20031461",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  18,
+                           "address":  "Nicolás Avellaneda 459 (Mismo edificio)",
+                           "approx":  false,
+                           "geoQuery":  "Nicolas Avellaneda 459",
+                           "geoDisplay":  "459, Nicolás Avellaneda, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4070587,
+                           "lon":  -64.1942945,
+                           "floor":  "4°",
+                           "price":  "USD 58.300",
+                           "priceNum":  58300,
+                           "expenses":  "$110.000",
+                           "area":  "51 m²",
+                           "areaNum":  51,
+                           "usdM2":  "USD 1.143",
+                           "usdM2Num":  1143,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (Orientación Norte) + Terraza común c/ asadores",
+                           "lighting":  "Buena (Orientación Norte)",
+                           "gas":  "A verificar (todos los servicios activos)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente (ficha dice Interno)",
+                           "condition":  "Excelente (1 año / A estrenar)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "SOYS Inmobiliaria (Tel: 351-5954249) - Ref: SAP8653565 / ZP 59885378",
+                           "notes":  "MISMO EDIFICIO QUE FILAS 16-17 (piso 4° contrafrente, USD 58.300 vs piso 2° USD 57.000 y piso 10° USD 72.500). Sup. cub. 48 m² / tot. 51 m². Posesión inmediata, venta por boleto. Terraza común con 4 asadores, 2 ascensores, llave magnética, seguridad, porcelanato, grifería Johnson.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-vendo-departamento-1-dormitorio-alberdi-nicolas-59885378.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  19,
+                           "address":  "Av. Santa Fe 225",
+                           "approx":  false,
+                           "geoQuery":  "Avenida Santa Fe 225",
+                           "geoDisplay":  "225, Avenida Santa Fe, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.40805,
+                           "lon":  -64.2006875,
+                           "floor":  "7° E",
+                           "price":  "USD 53.000",
+                           "priceNum":  53000,
+                           "expenses":  "$132.600",
+                           "area":  "38 m²",
+                           "areaNum":  38,
+                           "usdM2":  "USD 1.395",
+                           "usdM2Num":  1395,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí",
+                           "lighting":  "Muy Buena (Luminoso, Orientación Este)",
+                           "gas":  "No (Edificio 100% eléctrico)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (9 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "FLUIR Servicios Inmobiliarios (CPI 4446, Tel: 351-2952941) - Ref: FAP6463768 / ZP 60679811",
+                           "notes":  "Sup. cubierta 36 m² / total 38 m². Apto crédito y con escritura. Posesión inmediata. Edificio 100% eléctrico con termotanque, cocina integrada, ascensor. Frente a Jefatura de Policía y a mts de Av. Colón.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-vendo-depto-1dormitorio-frente-a-jefatura-de-policia-60679811.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  20,
+                           "address":  "Av. Santa Fe al 300",
+                           "approx":  true,
+                           "geoQuery":  "Avenida Santa Fe 350",
+                           "geoDisplay":  "350, Avenida Santa Fe, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4067512,
+                           "lon":  -64.2000413,
+                           "floor":  "1°",
+                           "price":  "USD 55.000",
+                           "priceNum":  55000,
+                           "expenses":  "$98.000",
+                           "area":  "42 m²",
+                           "areaNum":  42,
+                           "usdM2":  "USD 1.310",
+                           "usdM2Num":  1310,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (al frente) + Terraza en edificio",
+                           "lighting":  "Muy Buena (Luminoso, Orientación Norte)",
+                           "gas":  "A verificar (calefacción)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (16-20 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Tea Funes (Tel: 351-5318218, ZP 60174742) / LEVEN (CPI 7440, Tel: 351-2502315, ZP 60476420)",
+                           "notes":  "Con escritura y apto crédito (según 2° aviso). Orientación Norte, al frente con balcón, cocina semi independiente, AA, calefacción, permite mascotas, ascensor, encargado/vigilancia, terraza en edificio. A 1 cuadra de Central de Policía.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-alberdi-s-santa-fe-al-300-a-mtrs.-policia-frente-60174742.html",
+                                             "label":  "Ver Aviso 1"
+                                         },
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-venta-departamento-1-dormitorio-con-balcon-alberdi-60476420.html",
+                                             "label":  "Ver Aviso 2"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  21,
+                           "address":  "9 de Julio 1057",
+                           "approx":  false,
+                           "geoQuery":  "9 de Julio 1057",
+                           "geoDisplay":  "1057, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4107142,
+                           "lon":  -64.1979057,
+                           "floor":  "A verificar",
+                           "price":  "USD 68.000",
+                           "priceNum":  68000,
+                           "expenses":  "$108.000",
+                           "area":  "40 m²",
+                           "areaNum":  40,
+                           "usdM2":  "USD 1.700",
+                           "usdM2Num":  1700,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí",
+                           "lighting":  "A verificar",
+                           "gas":  "A verificar (caldera y radiadores)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "A verificar",
+                           "condition":  "Bueno (10 años)",
+                           "priority":  "Baja",
+                           "score":  "6",
+                           "contact":  "VEGAS IN (CPI 2655, Tel: 351-3500077) - Ref: VAP8407340 / ZP 59469741",
+                           "notes":  "Edificio con amenities (pileta y quincho), ascensor. Calefacción por caldera y radiadores. Valor por m² alto (USD 1.700/m²).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-9-de-julio-n-1057-amenities-pileta-y-quincho!-59469741.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  22,
+                           "address":  "9 de Julio 1057 (Mismo edificio)",
+                           "approx":  false,
+                           "geoQuery":  "9 de Julio 1057",
+                           "geoDisplay":  "1057, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4107142,
+                           "lon":  -64.1979057,
+                           "floor":  "A verificar",
+                           "price":  "USD 70.000",
+                           "priceNum":  70000,
+                           "expenses":  "$80.000",
+                           "area":  "53 m²",
+                           "areaNum":  53,
+                           "usdM2":  "USD 1.309",
+                           "usdM2Num":  1309,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (externo contrafrente)",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "A verificar (radiador en foto)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Excelente / Moderno (10 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Pérez Quirós Inmobiliaria (Tel: 351-3222444) - Ref: IAP7951035 / ZP 58859086",
+                           "notes":  "MISMO EDIFICIO QUE FILA 21 (publicado como 9 de Julio al 1100, dirección real 9 de Julio 1057). Sup. propia 43,37 m² / total 53,48 m² (ficha 44 m²). Apto crédito, apto profesional, permite mascotas. Amenities: patio con quincho, asador y pileta.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-se-vende-dpto-moderno-en-9-de-julio-58859086.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  23,
+                           "address":  "La Rioja al 1000",
+                           "approx":  true,
+                           "geoQuery":  "La Rioja 1050",
+                           "geoDisplay":  "1050, La Rioja, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4070883,
+                           "lon":  -64.1965184,
+                           "floor":  "Piso alto (a verificar)",
+                           "price":  "USD 52.000",
+                           "priceNum":  52000,
+                           "expenses":  "$120.000",
+                           "area":  "49 m²",
+                           "areaNum":  49,
+                           "usdM2":  "USD 1.061",
+                           "usdM2Num":  1061,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (amplio al frente)",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "A verificar (calefacción)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (15 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "BR HAUS - Ref: BAP13980540 / ZP 60743204",
+                           "notes":  "Con escritura. Cocina semi integrada, placard con interiores, ascensor. Expensas $120.000-$125.000 aprox. A 200 m de Plaza Colón, frente al Inst. Mariano Moreno. Muy buena relación precio/m².",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-departamento-en-venta-1-dormitorio-en-b-alberdi-con-60743204.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  24,
+                           "address":  "Calle La Rioja (Posible mismo edificio)",
+                           "approx":  true,
+                           "geoQuery":  "La Rioja 1050",
+                           "geoDisplay":  "1050, La Rioja, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4070883,
+                           "lon":  -64.1965184,
+                           "floor":  "A verificar",
+                           "price":  "USD 49.000",
+                           "priceNum":  49000,
+                           "expenses":  "$120.000",
+                           "area":  "42 m²",
+                           "areaNum":  42,
+                           "usdM2":  "USD 1.167",
+                           "usdM2Num":  1167,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "No informa",
+                           "lighting":  "Buena (Orientación Norte)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Lateral",
+                           "condition":  "Muy Bueno (15 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Lanz Bienes Raíces - Marilina Lanz (CPI 8444) - Ref: PRO-65119-613152 / AP 20666626",
+                           "notes":  "POSIBLE MISMO EDIFICIO QUE FILA 23 (misma calle, 2 cuadras de Plaza Colón, 15 años, expensas $120.000). Apto crédito, se evalúan ofertas. Cocina separada, ambientes amplios, orientación Norte, disposición lateral.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20666626",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  25,
+                           "address":  "Av. Colón 1734",
+                           "approx":  false,
+                           "geoQuery":  "Avenida Colon 1734",
+                           "geoDisplay":  "1734, Avenida Colón, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4067106,
+                           "lon":  -64.2064067,
+                           "floor":  "10° (Último piso - Dúplex)",
+                           "price":  "USD 46.600",
+                           "priceNum":  46600,
+                           "expenses":  "$160.000",
+                           "area":  "32 m²",
+                           "areaNum":  32,
+                           "usdM2":  "USD 1.456",
+                           "usdM2Num":  1456,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (en suite)",
+                           "balcony":  "Sí + Terraza propia",
+                           "lighting":  "A verificar (Orientación Sur)",
+                           "gas":  "No (edificio tiene instalación, falta conectar)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (10 años)",
+                           "priority":  "Media",
+                           "score":  "6",
+                           "contact":  "Lopez Baena Propiedades - Maximiliano Lujan (CPI 4199, Tel: 351-8721882) - Ref: LAP11930950 / ZP 60439170",
+                           "notes":  "Dúplex de 2 plantas en último piso (sin vecinos arriba) con balcón y amplia terraza propia. Venta por boleto. Expensas altas ($160.000) y sup. chica (32 m²). Acepta vehículo / escucha oferta contado.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-venta-duplex-1-dormitorio-alberdi-ultimo-piso-60439170.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  26,
+                           "address":  "Av. Colón 1734 (Mismo edificio)",
+                           "approx":  false,
+                           "geoQuery":  "Avenida Colon 1734",
+                           "geoDisplay":  "1734, Avenida Colón, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4067106,
+                           "lon":  -64.2064067,
+                           "floor":  "8°",
+                           "price":  "USD 53.000",
+                           "priceNum":  53000,
+                           "expenses":  "$150.000",
+                           "area":  "61 m²",
+                           "areaNum":  61,
+                           "usdM2":  "USD 869",
+                           "usdM2Num":  869,
+                           "bedrooms":  "1 1/2 Dormitorios",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (con parrilla)",
+                           "lighting":  "Muy Buena (Excelente luminosidad)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Muy Bueno (A estrenar)",
+                           "priority":  "Alta",
+                           "score":  "9",
+                           "contact":  "Mudafy Roggio Bustos (CPI 7554) - AP 20575893",
+                           "notes":  "MISMO EDIFICIO QUE FILA 25 (piso 8° contrafrente, 61 m² cub/tot vs dúplex 32 m²). 1 dorm + escritorio/ambiente adicional, balcón con parrilla, gas natural, termotanque, desayunador, ascensor, acceso movilidad reducida, acepta mascotas, 7 deptos/piso. Expensas $150.000 incluyen Rentas, Muni y Aguas. Excelente precio/m².",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-4-ambientes--20575893",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  27,
+                           "address":  "Dean Funes 749",
+                           "approx":  false,
+                           "geoQuery":  "Dean Funes 749",
+                           "geoDisplay":  "749, Deán Funes, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.413087,
+                           "lon":  -64.1941752,
+                           "floor":  "7°",
+                           "price":  "USD 55.000",
+                           "priceNum":  55000,
+                           "expenses":  "No informa",
+                           "area":  "39 m²",
+                           "areaNum":  39,
+                           "usdM2":  "USD 1.410",
+                           "usdM2Num":  1410,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "No Posee",
+                           "lighting":  "Buena (Piso alto, Orientación Norte)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Bueno (30 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Grupo Forte (CPI 7364, Tel: 351-6186821) - Ref: 6537095 / ZP 60315696",
+                           "notes":  "Con escritura. 7° piso con ascensor, sin balcón, cocina separada, pisos de parquet, aire acondicionado. Se entrega desocupado. Todos los servicios (agua, luz y gas natural), encargado/vigilancia. A 2 cuadras de Cañada y Av. Colón. (Datos ampliados con aviso de Facebook).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-departamento-en-venta-alberdi-60315696.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  28,
+                           "address":  "9 de Julio al 1100",
+                           "approx":  true,
+                           "geoQuery":  "9 de Julio 1150",
+                           "geoDisplay":  "1150, 9 de Julio, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4102092,
+                           "lon":  -64.1991539,
+                           "floor":  "1° por escalera (sin ascensor)",
+                           "price":  "USD 47.000",
+                           "priceNum":  47000,
+                           "expenses":  "$167.367",
+                           "area":  "42 m²",
+                           "areaNum":  42,
+                           "usdM2":  "USD 1.119",
+                           "usdM2Num":  1119,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (al frente, 2 m²)",
+                           "lighting":  "Muy Buena (excelente iluminación y ventilación)",
+                           "gas":  "A verificar (calefacción)",
+                           "laundry":  "Sí (en cocina separada)",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Remodelado (40 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "CABALEN PROPIEDADES (Tel: 351-3263930) - Ref: CAP8582974 / ZP 59784001",
+                           "notes":  "Sup. cub. 40 m² + 2 m² balcón. Remodelado y desocupado. Cocina separada, puerta blindada, baño con extractor, pasillo con placard. SIN ascensor (1° piso por escalera) y expensas altas ($167.367). A 2 cuadras de Jefatura.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-excelente-departamento-de-1-dormitorio-con-balcon-al-59784001.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  29,
+                           "address":  "27 de Abril 1183",
+                           "approx":  false,
+                           "geoQuery":  "27 de Abril 1183",
+                           "geoDisplay":  "1183, 27 de Abril, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4125026,
+                           "lon":  -64.2004717,
+                           "floor":  "4°",
+                           "price":  "USD 69.900",
+                           "priceNum":  69900,
+                           "expenses":  "$70.000",
+                           "area":  "42 m²",
+                           "areaNum":  42,
+                           "usdM2":  "USD 1.664",
+                           "usdM2Num":  1664,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (con antebaño)",
+                           "balcony":  "Sí (amplio)",
+                           "lighting":  "Buena (Luminoso)",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "A verificar",
+                           "condition":  "Excelente (11 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "RE/MAX Cumbre - Emanuel Pedernera (CPI 6611) - Ref: AR.42.138.153.57 / AP 20888289",
+                           "notes":  "Sup. cubierta 40 m² / total 42 m². Apto crédito. Expensas bajas ($70.000), cocina integrada, baño y antebaño. Alquilado con contrato vigente hasta julio 2027. A 100 m de Nuevocentro Shopping.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20888289",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  30,
+                           "address":  "27 de Abril 1188",
+                           "approx":  false,
+                           "geoQuery":  "27 de Abril 1188",
+                           "geoDisplay":  "1188, 27 de Abril, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4123145,
+                           "lon":  -64.2004823,
+                           "floor":  "7°",
+                           "price":  "USD 63.000",
+                           "priceNum":  63000,
+                           "expenses":  "$115.000",
+                           "area":  "70 m²",
+                           "areaNum":  70,
+                           "usdM2":  "USD 900",
+                           "usdM2Num":  900,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí + Terraza propia 30 m² c/ asador",
+                           "lighting":  "Muy Buena (Luminoso, Orientación Norte)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Bueno (15 años)",
+                           "priority":  "Alta",
+                           "score":  "9",
+                           "contact":  "Inmobiliaria Cassinelli (Tel: 351-3163558) - Ref: 28NN2D / ZP 55721773",
+                           "notes":  "Sup. cubierta 40 m² + 30 m² terraza exclusiva con asador (total 70 m²). Apto crédito y con escritura. Orientación Norte. Actualmente con renta pero se puede entregar desocupado. A pasos de Nuevocentro Shopping y Centro.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-dpto-en-venta-con-terraza!-55721773.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  31,
+                           "address":  "Santa Rosa al 1300",
+                           "approx":  true,
+                           "geoQuery":  "Santa Rosa 1350",
+                           "geoDisplay":  "1350, Santa Rosa, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4070966,
+                           "lon":  -64.2010335,
+                           "floor":  "5°",
+                           "price":  "USD 60.000",
+                           "priceNum":  60000,
+                           "expenses":  "$80.000",
+                           "area":  "50 m²",
+                           "areaNum":  50,
+                           "usdM2":  "USD 1.200",
+                           "usdM2Num":  1200,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño + 1 Toilette",
+                           "balcony":  "Sí (amplio)",
+                           "lighting":  "Buena (Orientación NE)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Excelente (4 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Fábregas Molina Negocios Inmobiliarios - Ref: PRO-34706-599362 / AP 20614667",
+                           "notes":  "Sup. cubierta 43 m² / descubierta 7 m² / total 50 m². Gas natural conectado, cocina separada, 1 baño completo + 1 toilette, amplio balcón, ascensor principal y de servicio, internet. Opción de comprarlo amoblado y mantener renta 1 año o habitarlo. A metros de Av. Santa Fe.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20614667",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  32,
+                           "address":  "Urquiza 80",
+                           "approx":  false,
+                           "geoQuery":  "Justo Jose de Urquiza 80",
+                           "geoDisplay":  "80, Justo José de Urquiza, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4120022,
+                           "lon":  -64.1943992,
+                           "floor":  "5°",
+                           "price":  "USD 55.000",
+                           "priceNum":  55000,
+                           "expenses":  "$35.000",
+                           "area":  "31 m²",
+                           "areaNum":  31,
+                           "usdM2":  "USD 1.774",
+                           "usdM2Num":  1774,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (con bañera)",
+                           "balcony":  "No (patio común en PB)",
+                           "lighting":  "Muy Buena (Luminoso, Orientación NE)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Excelente (15 años)",
+                           "priority":  "Baja",
+                           "score":  "6",
+                           "contact":  "Lanz Bienes Raíces - Sandra Gomez (CPI 7506) - Ref: PRO-65119-422953 / AP 19916714",
+                           "notes":  "Con escritura. Expensas muy bajas ($35.000), ascensor, acepta mascotas, cocina c/ barra desayunadora. Superficie chica (31 m², USD 1.774/m²) y sin balcón propio. Alquilado en $350.000/mes.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--19916714",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  33,
+                           "address":  "Justo José de Urquiza 100",
+                           "approx":  false,
+                           "geoQuery":  "Justo Jose de Urquiza 120",
+                           "geoDisplay":  "120, Justo José de Urquiza, Alberdi, Córdoba",
+                           "lat":  -31.4114294,
+                           "lon":  -64.1942037,
+                           "floor":  "10°",
+                           "price":  "USD 65.000",
+                           "priceNum":  65000,
+                           "expenses":  "No informa",
+                           "area":  "55 m²",
+                           "areaNum":  55,
+                           "usdM2":  "USD 1.182",
+                           "usdM2Num":  1182,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (Balcón y Terraza)",
+                           "lighting":  "Muy Buena (Amplias ventanas)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Remodelado (54 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Mudafy Roggio Bustos (CPI 7554) - AP 20252276",
+                           "notes":  "Av. Colón y Urquiza. Sup. cubierta 52 m² / propia 55 m². Cocina separada y baño remodelados (cañerías nuevas), pisos parquet, apto profesional, permite mascotas. Edificio antiguo (54 años).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20252276",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  34,
+                           "address":  "Santa Fe al 100 (Vitacura 02)",
+                           "approx":  true,
+                           "geoQuery":  "Avenida Santa Fe 150",
+                           "geoDisplay":  "150, Avenida Santa Fe, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4090789,
+                           "lon":  -64.2009264,
+                           "floor":  "A verificar",
+                           "price":  "USD 64.500",
+                           "priceNum":  64500,
+                           "expenses":  "$100.000",
+                           "area":  "45 m²",
+                           "areaNum":  45,
+                           "usdM2":  "USD 1.433",
+                           "usdM2Num":  1433,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (con bañera)",
+                           "balcony":  "Sí",
+                           "lighting":  "A verificar",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "Opcional (disponibles en edificio)",
+                           "disposition":  "Contrafrente",
+                           "condition":  "Excelente (8-10 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Grupo Forte Inmobiliaria (CPI 7364) - Ref: 254929-6529722 / AP 20428649",
+                           "notes":  "Sup. cubierta 38 m² / total 45 m². Apto crédito, escritura y planos. Edificio Vitacura 02 con pileta, solárium, SUM y cámaras de seguridad. Cocheras disponibles en el edificio. A metros de Av. Colón.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20428649",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  35,
+                           "address":  "Nicolás Avellaneda al 300",
+                           "approx":  true,
+                           "geoQuery":  "Nicolas Avellaneda 350",
+                           "geoDisplay":  "350, Nicolás Avellaneda, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4083989,
+                           "lon":  -64.1946329,
+                           "floor":  "5°",
+                           "price":  "USD 60.000",
+                           "priceNum":  60000,
+                           "expenses":  "$125.000",
+                           "area":  "40 m²",
+                           "areaNum":  40,
+                           "usdM2":  "USD 1.500",
+                           "usdM2Num":  1500,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (externo)",
+                           "lighting":  "Buena (Orientación Oeste)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Muy Bueno (11 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "MONTE INMOBILIARIA (CPI 4737) - Ref: 5CBK_882 / AP 20483782",
+                           "notes":  "Cocina separada, desocupado, venta por boleto. A metros de Plaza Colón y pocas cuadras del Centro.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-alberdi-2-ambientes--20483782",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  36,
+                           "address":  "San José de Calasanz 351 (Calasanz Domo)",
+                           "approx":  false,
+                           "geoQuery":  "San Jose de Calasanz 351",
+                           "geoDisplay":  "San José de Calasanz 130, San José de Calazans, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4139372,
+                           "lon":  -64.1967023,
+                           "floor":  "3°",
+                           "price":  "USD 58.000",
+                           "priceNum":  58000,
+                           "expenses":  "No informa",
+                           "area":  "No informa",
+                           "areaNum":  null,
+                           "usdM2":  "",
+                           "usdM2Num":  null,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (c/ antebaño) + 1 Toilette",
+                           "balcony":  "Sí (balcón interno)",
+                           "lighting":  "Buena (Luminoso)",
+                           "gas":  "No",
+                           "laundry":  "A verificar",
+                           "garage":  "Opcional (disponibles en edificio)",
+                           "disposition":  "Interno",
+                           "condition":  "Excelente (antigüedad no informa)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "ALTOS DE ESTRADA - Ref: 4D8L_385 / AP 11075994",
+                           "notes":  "Cocina comedor separada, baño c/ antebaño + toilette. Complejo con pileta, asadores y cocheras disponibles (no incluidas). No informa superficie ni expensas.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.argenprop.com/departamento-en-venta-en-cordoba-2-ambientes--11075994",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  37,
+                           "address":  "Deán Funes 598 (Centro)",
+                           "approx":  false,
+                           "geoQuery":  "Dean Funes 598",
+                           "geoDisplay":  "598, Deán Funes, Centro, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4135524,
+                           "lon":  -64.1920782,
+                           "floor":  "A verificar",
+                           "price":  "USD 63.000",
+                           "priceNum":  63000,
+                           "expenses":  "$60.000",
+                           "area":  "40 m²",
+                           "areaNum":  40,
+                           "usdM2":  "USD 1.575",
+                           "usdM2Num":  1575,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (reciclado)",
+                           "balcony":  "No Posee",
+                           "lighting":  "Muy Buena (Luminoso, Orientación SE)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "Sí (en baño reciclado)",
+                           "garage":  "No informa",
+                           "disposition":  "Frente (vista a Cañada)",
+                           "condition":  "Bueno / Baño reciclado (54 años)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Inmobiliaria Cassinelli (Tel: 351-3163558) - Ref: 2EHBB7 / ZP 60409237",
+                           "notes":  "Centro, a la vuelta de Cañada. Sup. cubierta 36 m² / total 40 m². Con escritura, expensas bajas ($60.000), cocina separada, parquet, sin balcón. Actualmente amoblado y alquilado (~$700.000/mes).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-con-vista-a-canada!-60409237.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  38,
+                           "address":  "Caseros 651 (Centro)",
+                           "approx":  false,
+                           "geoQuery":  "Caseros 651",
+                           "geoDisplay":  "651, Caseros, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4157655,
+                           "lon":  -64.1937175,
+                           "floor":  "A verificar (edificio de 7 pisos)",
+                           "price":  "USD 45.000",
+                           "priceNum":  45000,
+                           "expenses":  "$80.000",
+                           "area":  "29 m²",
+                           "areaNum":  29,
+                           "usdM2":  "USD 1.552",
+                           "usdM2Num":  1552,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "No informa",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "A verificar",
+                           "condition":  "Bueno (60 años)",
+                           "priority":  "Baja",
+                           "score":  "6",
+                           "contact":  "VITA NOVA BIENES RAÍCES (Tel: 351-3971645) - Ref: KP593129 / ZP 60487494",
+                           "notes":  "Centro (Edificio Carinar 2), cerca de Plaza de la Intendencia y Patio Olmos. Con escritura, pisos de parquet en excelente estado. Superficie chica (29 m²) y 60 años de antigüedad.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-departamento-en-venta-caseros-60487494.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  39,
+                           "address":  "Muñiz 55 (Edificio Meletios)",
+                           "approx":  false,
+                           "geoQuery":  "Francisco Muniz 55",
+                           "geoDisplay":  "55, Doctor Francisco Muñiz, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4074391,
+                           "lon":  -64.2099182,
+                           "floor":  "4°",
+                           "price":  "USD 52.000",
+                           "priceNum":  52000,
+                           "expenses":  "No informa",
+                           "area":  "No informa",
+                           "areaNum":  null,
+                           "usdM2":  "",
+                           "usdM2Num":  null,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (Terraza balcón)",
+                           "lighting":  "Muy Buena (Luminoso, vista abierta al parque)",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente / Externo",
+                           "condition":  "Excelente (antigüedad no informa)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Benja Oliva Becerra (FB Marketplace)",
+                           "notes":  "Entre 9 de Julio y Deán Funes. Edificio Meletios (2 torres) con piscina y guardia de seguridad. Cocina semi separada, living comedor amplio, terraza balcón con vista al parque. No informa m² ni expensas.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.facebook.com/marketplace/item/1431577392463349/",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  40,
+                           "address":  "Av. Figueroa Alcorta al 200 (sobre Cañada)",
+                           "approx":  true,
+                           "geoQuery":  "Avenida Figueroa Alcorta 250",
+                           "geoDisplay":  "250, Avenida Figueroa Alcorta, Centro, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4107629,
+                           "lon":  -64.1907766,
+                           "floor":  "5°",
+                           "price":  "USD 68.500",
+                           "priceNum":  68500,
+                           "expenses":  "No informa",
+                           "area":  "57 m²",
+                           "areaNum":  57,
+                           "usdM2":  "USD 1.202",
+                           "usdM2Num":  1202,
+                           "bedrooms":  "2 Dormitorios",
+                           "bathrooms":  "1 Baño (a verificar)",
+                           "balcony":  "Sí (Balcón terraza)",
+                           "lighting":  "A verificar (vista a calle Santa Rosa)",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Contrafrente / Lateral",
+                           "condition":  "A refaccionar cocina (antigüedad no informa)",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Lanz Bienes Raíces - Paola Marilina Lanz (CPI 8444) / Renata Alberti (FB)",
+                           "notes":  "Sobre La Cañada, 57 m² cubiertos, 2 dormitorios, balcón terraza con vista a calle Santa Rosa. Con escritura y desocupado. ATENCIÓN: requiere cambio de cañería en la cocina (reflejado en el precio).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.facebook.com/marketplace/item/2133571873923561/",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  41,
+                           "address":  "Belgrano 327 (Edificio Galicia, Centro)",
+                           "approx":  false,
+                           "geoQuery":  "Belgrano 327",
+                           "geoDisplay":  "327, Belgrano, Centro, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4185658,
+                           "lon":  -64.189617,
+                           "floor":  "8° B",
+                           "price":  "USD 55.000",
+                           "priceNum":  55000,
+                           "expenses":  "No informa",
+                           "area":  "No informa",
+                           "areaNum":  null,
+                           "usdM2":  "",
+                           "usdM2Num":  null,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (a verificar)",
+                           "balcony":  "Sí",
+                           "lighting":  "A verificar",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "A verificar",
+                           "condition":  "A verificar",
+                           "priority":  "Media",
+                           "score":  "7",
+                           "contact":  "Marysol Manzano - RE/MAX Mediterránea (CPI 6868, Moisés Olariaga Buono)",
+                           "notes":  "Pleno Centro de Córdoba, Edificio Galicia, 8° piso B con balcón. No informa superficie, expensas ni antigüedad.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.facebook.com/marketplace/item/29042492322088582/",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  42,
+                           "address":  "Deán Funes 846",
+                           "approx":  false,
+                           "geoQuery":  "Dean Funes 846",
+                           "geoDisplay":  "846, Deán Funes, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4125671,
+                           "lon":  -64.1954132,
+                           "floor":  "PB",
+                           "price":  "USD 65.000",
+                           "priceNum":  65000,
+                           "expenses":  "No informa",
+                           "area":  "No informa",
+                           "areaNum":  null,
+                           "usdM2":  "",
+                           "usdM2Num":  null,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (a verificar)",
+                           "balcony":  "Patio (amplio)",
+                           "lighting":  "Buena (Luminoso)",
+                           "gas":  "A verificar (todos los servicios)",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Interno / PB",
+                           "condition":  "A verificar",
+                           "priority":  "Baja",
+                           "score":  "6",
+                           "contact":  "Claudia Di Lelle - RE/MAX (CPCPI 7335) - MLS #420471051-211",
+                           "notes":  "Entre Calasanz y Artigas, a 2 cuadras de Cañada y Av. Colón. PB interna luminosa con patio amplio, cocina, living comedor, 1 dorm con placard, todos los servicios. NO APTO CRÉDITO. No informa m² ni expensas.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.facebook.com/marketplace/item/1006128272539871/",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  43,
+                           "address":  "27 de Abril 980",
+                           "approx":  false,
+                           "geoQuery":  "27 de Abril 980",
+                           "geoDisplay":  "Minimercado Jorge, 980, 27 de Abril, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4132223,
+                           "lon":  -64.1973595,
+                           "floor":  "A verificar",
+                           "price":  "USD 65.000",
+                           "priceNum":  65000,
+                           "expenses":  "No informa",
+                           "area":  "60 m²",
+                           "areaNum":  60,
+                           "usdM2":  "USD 1.083",
+                           "usdM2Num":  1083,
+                           "bedrooms":  "2 Dormitorios",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "No informa",
+                           "lighting":  "A verificar",
+                           "gas":  "A verificar",
+                           "laundry":  "Sí (en cocina comedor)",
+                           "garage":  "No informa",
+                           "disposition":  "Lateral",
+                           "condition":  "Reciclado (50 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Ingrid Leguizamón Buenas Raíces (M.P. 04-3540, Tel: 351-3897274) - Ref: 2DR9K6 / ZP 59867706",
+                           "notes":  "Entre San José de Calasanz y Mariano Moreno. Sup. cubierta 55 m² / total 60 m². 2 dormitorios c/ placard, reciclado, con escritura, cocina comedor amoblada c/ espacio para heladera y lavarropas, encargado/vigilancia. Honorarios 3% comprador / 3% vendedor.",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-venta-departamento-reciclado-2-dorm.-z-colegios-59867706.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  44,
+                           "address":  "Av. Santa Fe al 200 (frente a Jefatura)",
+                           "approx":  true,
+                           "geoQuery":  "Avenida Santa Fe 230",
+                           "geoDisplay":  "230, Avenida Santa Fe, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4080501,
+                           "lon":  -64.2005422,
+                           "floor":  "A verificar",
+                           "price":  "USD 65.000",
+                           "priceNum":  65000,
+                           "expenses":  "No informa",
+                           "area":  "70 m²",
+                           "areaNum":  70,
+                           "usdM2":  "USD 929",
+                           "usdM2Num":  929,
+                           "bedrooms":  "2 Dormitorios",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (Doble balcón)",
+                           "lighting":  "Buena (Frente, doble balcón, buena ventilación)",
+                           "gas":  "Sí (Conectado)",
+                           "laundry":  "Sí (Lavadero integrado en cocina)",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (40 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Raíces de Allende - Natalia Brignoli (CPI 5561, Tel: 351-6324066) - Ref: RAP7815771 / ZP 58816455",
+                           "notes":  "Frente a Central de Policía. 70 m² cubiertos (+ 3 m² semicub.), 2 dormitorios c/ placard, doble balcón, cocina separada c/ lavadero, gas natural, permite mascotas. Con escritura, pero SOLO EFECTIVO (NO apto crédito). Excelente relación USD/m².",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-venta-dpto-2-dorm.-alberdi-58816455.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  45,
+                           "address":  "Deán Funes 477 (Centro)",
+                           "approx":  false,
+                           "geoQuery":  "Dean Funes 477",
+                           "geoDisplay":  "477, Deán Funes, La Peatonal, Centro, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.414175,
+                           "lon":  -64.1904303,
+                           "floor":  "A verificar (edif. 7 pisos)",
+                           "price":  "USD 69.000",
+                           "priceNum":  69000,
+                           "expenses":  "$150.000",
+                           "area":  "70 m²",
+                           "areaNum":  70,
+                           "usdM2":  "USD 986",
+                           "usdM2Num":  986,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño (antebaño y bañera)",
+                           "balcony":  "Sí (Balcón terraza propio 35 m²)",
+                           "lighting":  "Muy Buena (Luminoso)",
+                           "gas":  "A verificar (calefacción central c/ caldera y radiadores)",
+                           "laundry":  "A verificar",
+                           "garage":  "Opcional (parking en edificio)",
+                           "disposition":  "Frente",
+                           "condition":  "Excelente / Categoría (12 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "Sebastian Peralta (Tel: 351-2224605) - Ref: 2CK93R / ZP 58868217",
+                           "notes":  "Centro, a metros de La Cañada. Sup. cubierta 45 m² / total 70 m² (desc. menciona balcón terraza de 35 m²). Doble placard, cocina semi integrada, porcelanato, calefacción central por radiadores/caldera, edificio con parking (5 deptos/piso).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-un-dormitorio.-categoria.-terraza-propia.-centro!-58868217.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       },
+                       {
+                           "row":  46,
+                           "address":  "Av. Colón 1066 (Centro)",
+                           "approx":  false,
+                           "geoQuery":  "Avenida Colon 1066",
+                           "geoDisplay":  "1066, Avenida Colón, Alberdi, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",
+                           "lat":  -31.4092498,
+                           "lon":  -64.1975247,
+                           "floor":  "A verificar",
+                           "price":  "USD 53.000",
+                           "priceNum":  53000,
+                           "expenses":  "$70.000",
+                           "area":  "50 m²",
+                           "areaNum":  50,
+                           "usdM2":  "USD 1.060",
+                           "usdM2Num":  1060,
+                           "bedrooms":  "1 Dormitorio",
+                           "bathrooms":  "1 Baño",
+                           "balcony":  "Sí (a la calle)",
+                           "lighting":  "Buena (Luminoso, Orientación Norte)",
+                           "gas":  "A verificar",
+                           "laundry":  "A verificar",
+                           "garage":  "No informa",
+                           "disposition":  "Frente",
+                           "condition":  "Bueno (40 años)",
+                           "priority":  "Alta",
+                           "score":  "8",
+                           "contact":  "SANCHEZ Servicios Inmobiliarios (Tel: 351-3994152) - Ref: 2A99EA / ZP 56951530",
+                           "notes":  "A 1/2 cuadra de Plaza Colón y 100 m de Jefatura de Policía. Sup. cubierta 42 m² / total 50 m². Orientación Norte al frente con balcón a la calle, permite mascotas, 4 deptos/piso. Expensas bajas ($70.000). Disponible. (Aviso publicado hace +1 año, confirmar vigencia).",
+                           "links":  [
+                                         {
+                                             "url":  "https://www.zonaprop.com.ar/propiedades/clasificado/veclapin-vendo-dpto-av-colon-56951530.html",
+                                             "label":  "Ver Aviso"
+                                         }
+                                     ]
+                       }
+                   ],
+    "landmarks":  [
+                      {
+                          "lon":  -64.195781,
+                          "name":  "Plaza Colón",
+                          "lat":  -31.4092872
+                      },
+                      {
+                          "lon":  -64.2055521,
+                          "name":  "Nuevocentro Shopping",
+                          "lat":  -31.4122592
+                      },
+                      {
+                          "lon":  -64.1994275,
+                          "name":  "Jefatura de Policía",
+                          "lat":  -31.4081402
+                      },
+                      {
+                          "lon":  -64.1877843,
+                          "name":  "Patio Olmos Shopping",
+                          "lat":  -31.419747
+                      },
+                      {
+                          "name":  "Av. Colón y La Cañada",
+                          "lat":  -31.4112763,
+                          "lon":  -64.1908561
+                      }
+                  ]
+};
+
+    const embeddedCoordsByAddr = {};
+    DATA.properties.forEach(p => {
+      if (typeof p.lat === "number" && typeof p.lon === "number") {
+        embeddedCoordsByAddr[String(p.address || "").toLowerCase().trim()] = { lat: p.lat, lon: p.lon, approx: p.approx };
+      }
+    });
+
+    const map = L.map("map", { zoomControl: true }).setView([-31.4105, -64.198], 15);
+    const esriStreet = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Tiles &copy; Esri",
+      maxZoom: 19
+    }).addTo(map);
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19
+    });
+    const esriSat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Tiles &copy; Esri",
+      maxZoom: 19
+    });
+    L.control.layers({ "Calles - Esri": esriStreet, "OpenStreetMap": osm, "Satélite": esriSat }, null, { position: "topright" }).addTo(map);
+
+    function applyOffsets(list) {
+      const coordGroups = {};
+      list.forEach(p => {
+        if (typeof p.lat !== "number" || typeof p.lon !== "number") return;
+        const key = `${p.lat.toFixed(5)}_${p.lon.toFixed(5)}`;
+        if (!coordGroups[key]) coordGroups[key] = [];
+        coordGroups[key].push(p);
+      });
+      Object.values(coordGroups).forEach(group => {
+        if (group.length === 1) {
+          group[0].dLat = group[0].lat;
+          group[0].dLon = group[0].lon;
+        } else {
+          const radius = 0.00013;
+          group.forEach((p, idx) => {
+            const angle = (2 * Math.PI * idx) / group.length - Math.PI / 2;
+            p.dLat = p.lat + radius * Math.sin(angle);
+            p.dLon = p.lon + radius * Math.cos(angle) * 1.15;
+          });
+        }
+      });
+    }
+    applyOffsets(DATA.properties);
+
+    const markersLayer = L.layerGroup().addTo(map);
+    const landmarksLayer = L.layerGroup().addTo(map);
+    const markerByRow = {};
+
+    DATA.landmarks.forEach(lm => {
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="landmark-pin">★ ${lm.name}</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [40, 12]
+      });
+      L.marker([lm.lat, lm.lon], { icon, interactive: false }).addTo(landmarksLayer);
+    });
+
+    function getColor(p, mode) {
+      if (mode === "priority") {
+        if (p.priority === "Alta") return "#10b981";
+        if (p.priority === "Media") return "#f59e0b";
+        return "#64748b";
+      }
+      if (mode === "price") {
+        if (!p.priceNum) return "#64748b";
+        if (p.priceNum <= 54000) return "#10b981";
+        if (p.priceNum <= 62000) return "#f59e0b";
+        return "#ef4444";
+      }
+      if (mode === "usdm2") {
+        if (!p.usdM2Num) return "#64748b";
+        if (p.usdM2Num <= 1150) return "#10b981";
+        if (p.usdM2Num <= 1400) return "#f59e0b";
+        return "#ef4444";
+      }
+      return "#2563eb";
+    }
+
+    function updateLegend(mode) {
+      const el = document.getElementById("legend");
+      if (mode === "priority") {
+        el.innerHTML = `
+          <span class="legend-item"><i class="dot" style="background:#10b981"></i>Alta</span>
+          <span class="legend-item"><i class="dot" style="background:#f59e0b"></i>Media</span>
+          <span class="legend-item"><i class="dot" style="background:#64748b"></i>Baja</span>
+          <span class="legend-item">★ Referencias</span>`;
+      } else if (mode === "price") {
+        el.innerHTML = `
+          <span class="legend-item"><i class="dot" style="background:#10b981"></i>≤ USD 54k</span>
+          <span class="legend-item"><i class="dot" style="background:#f59e0b"></i>54k – 62k</span>
+          <span class="legend-item"><i class="dot" style="background:#ef4444"></i>&gt; 62k</span>`;
+      } else {
+        el.innerHTML = `
+          <span class="legend-item"><i class="dot" style="background:#10b981"></i>≤ USD 1.150/m²</span>
+          <span class="legend-item"><i class="dot" style="background:#f59e0b"></i>1.150 – 1.400</span>
+          <span class="legend-item"><i class="dot" style="background:#ef4444"></i>&gt; 1.400 / s/d</span>`;
+      }
+    }
+
+    function esc(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function buildPopup(p) {
+      const linksHtml = (p.links || []).map(l =>
+        `<a class="pop-btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`
+      ).join("");
+      const approxBadge = p.approx ? `<span class="badge approx" title="Dirección aproximada sobre la cuadra">Ubic. aprox.</span>` : "";
+      const prioCls = (p.priority || "").toLowerCase();
+      return `
+        <div>
+          <div class="pop-head">
+            <div class="pop-title">${esc(p.address)}</div>
+            <span class="row-tag">Fila ${p.row}</span>
+          </div>
+          <div class="pop-price">${esc(p.price)} ${p.usdM2 ? `<span style="font-size:12px;color:#6b7280;font-weight:600">(${esc(p.usdM2)}/m²)</span>` : ""}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;">
+            <span class="badge ${prioCls}">Prioridad ${esc(p.priority)} (${esc(p.score)}/10)</span>
+            ${approxBadge}
+          </div>
+          <div class="pop-grid">
+            <div class="pop-kv"><b>Piso:</b> ${esc(p.floor)}</div>
+            <div class="pop-kv"><b>Sup.:</b> ${esc(p.area)}</div>
+            <div class="pop-kv"><b>Expensas:</b> ${esc(p.expenses)}</div>
+            <div class="pop-kv"><b>Dorm/Baño:</b> ${esc(p.bedrooms)} / ${esc(p.bathrooms)}</div>
+            <div class="pop-kv"><b>Gas:</b> ${esc(p.gas)}</div>
+            <div class="pop-kv"><b>Lavarropas:</b> ${esc(p.laundry)}</div>
+            <div class="pop-kv"><b>Balcón:</b> ${esc(p.balcony)}</div>
+            <div class="pop-kv"><b>Disposición:</b> ${esc(p.disposition)}</div>
+            <div class="pop-kv" style="grid-column:span 2"><b>Estado:</b> ${esc(p.condition)}</div>
+            <div class="pop-kv" style="grid-column:span 2"><b>Contacto:</b> ${esc(p.contact)}</div>
+          </div>
+          <div class="pop-notes">${esc(p.notes)}</div>
+          <div class="pop-links">${linksHtml}</div>
+        </div>`;
+    }
+
+    function matchesFilters(p) {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const maxP = Number(document.getElementById("maxPrice").value);
+      const prio = document.getElementById("priorityFilter").value;
+      const gas = document.getElementById("gasFilter").value;
+      const bed = document.getElementById("bedFilter").value;
+      const chkCred = document.getElementById("chkCredito").checked;
+      const chkEsc = document.getElementById("chkEscritura").checked;
+
+      if (p.priceNum && p.priceNum > maxP) return false;
+      if (prio !== "all" && p.priority !== prio) return false;
+
+      const gasLow = (p.gas || "").toLowerCase();
+      if (gas === "si" && !gasLow.startsWith("sí") && !gasLow.startsWith("si")) return false;
+      if (gas === "no" && !gasLow.startsWith("no")) return false;
+      if (gas === "verif" && !gasLow.includes("verificar")) return false;
+
+      const bedLow = (p.bedrooms || "").toLowerCase();
+      if (bed === "1" && (bedLow.includes("2") || bedLow.includes("1 1/2"))) return false;
+      if (bed === "2" && !bedLow.includes("2") && !bedLow.includes("1 1/2")) return false;
+
+      const blob = `${p.address} ${p.notes} ${p.contact} ${p.condition} ${p.gas} fila ${p.row} #${p.row}`.toLowerCase();
+      if (chkCred && (!blob.includes("apto crédito") && !blob.includes("apto credito") || blob.includes("no apto crédito") || blob.includes("no apto credito"))) return false;
+      if (chkEsc && !blob.includes("escritura")) return false;
+
+      if (q && !blob.includes(q)) return false;
+      return true;
+    }
+
+    let activeRow = null;
+
+    function selectProperty(row, openPop = true) {
+      activeRow = row;
+      document.querySelectorAll(".card").forEach(c => {
+        c.classList.toggle("active", Number(c.dataset.row) === row);
+      });
+      const m = markerByRow[row];
+      if (m) {
+        map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 16), { duration: 0.45 });
+        if (openPop) m.openPopup();
+      }
+    }
+
+    function render() {
+      const mode = document.getElementById("colorMode").value;
+      updateLegend(mode);
+      markersLayer.clearLayers();
+      Object.keys(markerByRow).forEach(k => delete markerByRow[k]);
+
+      const filtered = DATA.properties.filter(matchesFilters);
+
+      // Stats
+      document.getElementById("statCount").textContent = `${filtered.length} / ${DATA.properties.length}`;
+      const priced = filtered.filter(p => p.priceNum);
+      const avgP = priced.length ? Math.round(priced.reduce((s, p) => s + p.priceNum, 0) / priced.length) : null;
+      const m2d = filtered.filter(p => p.usdM2Num);
+      const avgM2 = m2d.length ? Math.round(m2d.reduce((s, p) => s + p.usdM2Num, 0) / m2d.length) : null;
+      document.getElementById("statAvgPrice").textContent = avgP ? `USD ${avgP.toLocaleString("es-AR")}` : "-";
+      document.getElementById("statAvgM2").textContent = avgM2 ? `USD ${avgM2.toLocaleString("es-AR")}` : "-";
+
+      const listEl = document.getElementById("propList");
+      listEl.innerHTML = "";
+
+      filtered.forEach(p => {
+        const color = getColor(p, mode);
+        const icon = L.divIcon({
+          className: "",
+          html: `<div class="marker-pin" style="background:${color}">${p.row}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+          popupAnchor: [0, -12]
+        });
+        const marker = L.marker([p.dLat, p.dLon], { icon });
+        marker.bindTooltip(`#${p.row} · ${p.address} (${p.price})`, { direction: "top", offset: [0, -10] });
+        marker.bindPopup(buildPopup(p), { maxWidth: 320 });
+        marker.on("click", () => {
+          activeRow = p.row;
+          document.querySelectorAll(".card").forEach(c => {
+            const match = Number(c.dataset.row) === p.row;
+            c.classList.toggle("active", match);
+            if (match) c.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        });
+        marker.addTo(markersLayer);
+        markerByRow[p.row] = marker;
+
+        const card = document.createElement("div");
+        card.className = `card${activeRow === p.row ? " active" : ""}`;
+        card.dataset.row = p.row;
+
+        const gasLow = (p.gas || "").toLowerCase();
+        const gasBadge = gasLow.startsWith("sí") || gasLow.startsWith("si")
+          ? `<span class="badge gas-si">Gas: Sí</span>`
+          : (gasLow.startsWith("no") ? `<span class="badge gas-no">Gas: No</span>` : `<span class="badge">Gas: ?</span>`);
+        const prioCls = (p.priority || "").toLowerCase();
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="card-title">${esc(p.address)}</div>
+            <span class="row-tag">#${p.row}</span>
+          </div>
+          <div class="card-price">${esc(p.price)} <span>${esc(p.area)} ${p.usdM2 ? `· ${esc(p.usdM2)}/m²` : ""}</span></div>
+          <div class="badges">
+            <span class="badge ${prioCls}">${esc(p.priority)} (${esc(p.score)})</span>
+            ${gasBadge}
+            <span class="badge">${esc(p.bedrooms)}</span>
+            ${p.approx ? `<span class="badge approx">Aprox.</span>` : ""}
+          </div>`;
+        card.addEventListener("click", () => selectProperty(p.row, true));
+        listEl.appendChild(card);
+      });
+    }
+
+    function fitVisible() {
+      const pts = [];
+      markersLayer.eachLayer(l => pts.push(l.getLatLng()));
+      if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [36, 36], maxZoom: 16 });
+    }
+
+    ["searchInput", "priorityFilter", "gasFilter", "bedFilter", "colorMode", "chkCredito", "chkEscritura"].forEach(id => {
+      document.getElementById(id).addEventListener("input", render);
+      document.getElementById(id).addEventListener("change", render);
+    });
+    document.getElementById("maxPrice").addEventListener("input", e => {
+      document.getElementById("maxPriceLabel").textContent = `USD ${Number(e.target.value).toLocaleString("es-AR")}`;
+      render();
+    });
+    document.getElementById("chkLandmarks").addEventListener("change", e => {
+      if (e.target.checked) landmarksLayer.addTo(map);
+      else map.removeLayer(landmarksLayer);
+    });
+    document.getElementById("fitBtn").addEventListener("click", fitVisible);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("maxPrice").value = 75000;
+      document.getElementById("maxPriceLabel").textContent = "USD 75.000";
+      document.getElementById("priorityFilter").value = "all";
+      document.getElementById("gasFilter").value = "all";
+      document.getElementById("bedFilter").value = "all";
+      document.getElementById("chkCredito").checked = false;
+      document.getElementById("chkEscritura").checked = false;
+      render();
+      fitVisible();
+    });
+    document.getElementById("toggleSidebar").addEventListener("click", () => {
+      document.getElementById("sidebar").classList.toggle("collapsed");
+      setTimeout(() => map.invalidateSize(), 220);
+    });
+
+    function getActiveApiUrl() {
+      const param = new URLSearchParams(window.location.search).get("api");
+      if (param && /^https:\/\/script\.google\.com\//i.test(param.trim())) return param.trim();
+      if (APPS_SCRIPT_URL && /^https:\/\//i.test(APPS_SCRIPT_URL.trim())) return APPS_SCRIPT_URL.trim();
+      const saved = localStorage.getItem("apps_script_url");
+      return saved ? saved.trim() : "";
+    }
+
+    async function syncFromSheet(interactive) {
+      let url = getActiveApiUrl();
+      if (!url) {
+        if (!interactive) return;
+        const entered = window.prompt("Pegá la URL de aplicación web (/exec) de tu Google Apps Script:", "");
+        if (!entered || !entered.trim()) return;
+        url = entered.trim();
+        localStorage.setItem("apps_script_url", url);
+      }
+
+      const statusEl = document.getElementById("syncStatus");
+      statusEl.textContent = "Sincronizando...";
+      try {
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const json = await resp.json();
+        if (!json || !Array.isArray(json.properties)) throw new Error("JSON inválido");
+
+        const validProps = [];
+        let missingGeo = 0;
+        json.properties.forEach(p => {
+          if (typeof p.lat !== "number" || typeof p.lon !== "number") {
+            const fb = embeddedCoordsByAddr[String(p.address || "").toLowerCase().trim()];
+            if (fb) {
+              p.lat = fb.lat;
+              p.lon = fb.lon;
+              p.approx = fb.approx;
+            }
+          }
+          if (typeof p.lat === "number" && typeof p.lon === "number") {
+            validProps.push(p);
+          } else {
+            missingGeo++;
+          }
+        });
+
+        if (validProps.length > 0) {
+          DATA.properties = validProps;
+          applyOffsets(DATA.properties);
+          const maxFound = Math.max(75000, ...validProps.map(p => p.priceNum || 0));
+          const slider = document.getElementById("maxPrice");
+          if (maxFound > Number(slider.max)) {
+            slider.max = Math.ceil(maxFound / 1000) * 1000;
+            slider.value = slider.max;
+            document.getElementById("maxPriceLabel").textContent = `USD ${Number(slider.value).toLocaleString("es-AR")}`;
+          }
+          render();
+          fitVisible();
+        }
+        const hhmm = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+        statusEl.textContent = missingGeo > 0 ? `En vivo · ${hhmm} (${missingGeo} sin ubicar)` : `En vivo · ${hhmm}`;
+      } catch (err) {
+        statusEl.textContent = "Error al actualizar (usando locales)";
+        if (interactive) {
+          alert("No se pudo conectar con Google Sheets (" + err.message + "). Verificá la URL /exec o los permisos 'Cualquier persona' del Apps Script.");
+        }
+      }
+    }
+
+    document.getElementById("syncBtn").addEventListener("click", () => syncFromSheet(true));
+
+    render();
+    fitVisible();
+    if (getActiveApiUrl()) syncFromSheet(false);
+  </script>
+</body>
+</html>
