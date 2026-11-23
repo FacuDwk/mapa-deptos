@@ -242,16 +242,22 @@
     }
     .marker-pin:hover { transform: scale(1.18); z-index: 9999 !important; }
     .landmark-pin {
+      width: 26px;
+      height: 26px;
       background: #7c3aed;
       color: #fff;
       border: 2px solid #fff;
-      border-radius: 6px;
-      padding: 2px 6px;
-      font-size: 10.5px;
+      border-radius: 50%;
+      font-size: 13px;
       font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      transition: transform 0.12s;
+      cursor: pointer;
     }
+    .landmark-pin:hover { transform: scale(1.18); }
 
     @media (max-width: 720px) {
       aside { position: absolute; left: 0; top: 0; bottom: 0; height: 100%; }
@@ -328,7 +334,7 @@
             <label>Colorear puntos por</label>
             <select id="colorMode">
               <option value="priority">Prioridad</option>
-              <option value="price">Precio (USD)</option>
+              <option value="price" selected>Precio (USD)</option>
               <option value="usdm2">USD / m²</option>
             </select>
           </div>
@@ -1826,6 +1832,12 @@
                           "name":  "Av. Colón y La Cañada",
                           "lat":  -31.4112763,
                           "lon":  -64.1908561
+                      },
+                      {
+                          "name":  "Casa rosa",
+                          "lat":  -31.4080421,
+                          "lon":  -64.1977478,
+                          "color":  "#ec4899"
                       }
                   ]
 };
@@ -1881,13 +1893,18 @@
     const markerByRow = {};
 
     DATA.landmarks.forEach(lm => {
+      const bg = lm.color || "#7c3aed";
+      const sym = lm.color ? "🏠" : "★";
       const icon = L.divIcon({
         className: "",
-        html: `<div class="landmark-pin">★ ${lm.name}</div>`,
-        iconSize: [0, 0],
-        iconAnchor: [40, 12]
+        html: `<div class="landmark-pin" style="background:${bg}">${sym}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
       });
-      L.marker([lm.lat, lm.lon], { icon, interactive: false }).addTo(landmarksLayer);
+      const m = L.marker([lm.lat, lm.lon], { icon, interactive: true, zIndexOffset: 200 });
+      m.bindTooltip(lm.name, { direction: "top", offset: [0, -14] });
+      m.bindPopup("<b>" + String(lm.name || "").replace(/</g, "&lt;") + "</b>");
+      m.addTo(landmarksLayer);
     });
 
     function getColor(p, mode) {
@@ -1913,22 +1930,24 @@
 
     function updateLegend(mode) {
       const el = document.getElementById("legend");
+      const refHtml = `
+        <span class="legend-item"><i class="dot" style="background:#7c3aed"></i>★ Referencias</span>
+        <span class="legend-item"><i class="dot" style="background:#ec4899"></i>🏠 Casa rosa</span>`;
       if (mode === "priority") {
         el.innerHTML = `
           <span class="legend-item"><i class="dot" style="background:#10b981"></i>Alta</span>
           <span class="legend-item"><i class="dot" style="background:#f59e0b"></i>Media</span>
-          <span class="legend-item"><i class="dot" style="background:#64748b"></i>Baja</span>
-          <span class="legend-item">★ Referencias</span>`;
+          <span class="legend-item"><i class="dot" style="background:#64748b"></i>Baja</span>${refHtml}`;
       } else if (mode === "price") {
         el.innerHTML = `
           <span class="legend-item"><i class="dot" style="background:#10b981"></i>≤ USD 54k</span>
           <span class="legend-item"><i class="dot" style="background:#f59e0b"></i>54k – 62k</span>
-          <span class="legend-item"><i class="dot" style="background:#ef4444"></i>&gt; 62k</span>`;
+          <span class="legend-item"><i class="dot" style="background:#ef4444"></i>&gt; 62k</span>${refHtml}`;
       } else {
         el.innerHTML = `
           <span class="legend-item"><i class="dot" style="background:#10b981"></i>≤ USD 1.150/m²</span>
           <span class="legend-item"><i class="dot" style="background:#f59e0b"></i>1.150 – 1.400</span>
-          <span class="legend-item"><i class="dot" style="background:#ef4444"></i>&gt; 1.400 / s/d</span>`;
+          <span class="legend-item"><i class="dot" style="background:#ef4444"></i>&gt; 1.400 / s/d</span>${refHtml}`;
       }
     }
 
